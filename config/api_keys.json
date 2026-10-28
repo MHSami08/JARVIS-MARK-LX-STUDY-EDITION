@@ -1,0 +1,57 @@
+{
+    "gemini_api_key": "",
+    "os_system": "",
+    "hud_style": "core",
+    "wake_word_enabled": false,
+    "push_to_talk_enabled": false,
+    "assistant_name": "JARVIS",
+    "user_name": "",
+    "ui_color": "#00d4ff",
+    "plugins_enabled": {
+        "manage_file_access": true
+    },
+    "noise_gate": {
+        "enabled": true,
+        "strength": "medium"
+    },
+    "proactive_audio": true,
+    "turn_tuning": {
+        "enabled": true,
+        "silence_ms": 700,
+        "prefix_ms": 200,
+        "start_sensitivity": "low",
+        "end_sensitivity": "high"
+    },
+    "barge_in_enabled": false,
+    "barge_in_sensitivity": "high",
+    "openrouter_api_key": "",
+    "routing_rules": {
+        "fast": [
+            "gemini:gemini-2.5-flash-lite",
+            "gemini:gemini-2.5-flash",
+            {
+                "provider": "openrouter",
+                "model": "openrouter/free"
+            }
+        ],
+        "coding": [
+            {
+                "provider": "openrouter",
+                "model": "cohere/command-r-plus:free"
+            },
+            {
+                "provider": "openrouter",
+                "model": "deepseek/deepseek-r1:free"
+            },
+            "gemini:gemini-2.5-flash"
+        ],
+        "writing": [
+            {
+                "provider": "openrouter",
+                "model": "nvidia/llama-3.1-nemotron-70b-instruct:free"
+            },
+            "gemini:gemini-2.5-flash"
+        ]
+    },
+    "groq_api_key": ""
+}
