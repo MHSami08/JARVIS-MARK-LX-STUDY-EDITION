@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Secrets and local runtime state
+config/api_keys.json
+.env
+.env.*
+data/
+memory/*.db
+memory/*.sqlite
+logs/
+*.log
+
+# Generated study artifacts / caches
+runtime/generated/
+study_output/
