@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="bn" class="dark">
+<head>
+<meta charset="utf-8">
+<title>JARVIS Study Board</title>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/auto-render.min.js"></script>
+<script src="vendor/plotly/plotly.min.js"></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  /* ── Design tokens: modern eye-comfort dark system (Linear/Raycast flavoured) ── */
+  :root {
+    color-scheme: dark;
+    --bg-core:      #05080d;
+    --surface-hi:   #111C2D;
+    --surface-mid:  #0B1320;
+    --surface-lo:   #090F1A;
+    --line-soft:    rgba(148, 163, 184, 0.18);
+    --line-mid:     rgba(148, 163, 184, 0.28);
+    --text-1:       #F8FAFC;
+    --text-2:       #E2E8F0;
+    --text-3:       #94A3B8;
+    --cyan:         #38BDF8;
+    --indigo:       #818CF8;
+    --violet:       #A855F7;
+    --amber:        #F59E0B;
+    --emerald:      #10B981;
+    --teal:         #14B8A6;
+    --rose:         #F43F5E;
+    --radius-card:  22px;
+    --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+    --shadow-3d:
+      0 20px 50px rgba(0, 0, 0, 0.75),
+      0 8px 20px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%; margin: 0; color: var(--text-2);
+    font-family: 'Anek Bangla', 'Hind Siliguri', 'Inter',
+                 'Nirmala UI', 'Noto Sans Bengali', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 500; font-size: 17px; line-height: 1.7; letter-spacing: 0.1px;
+    background:
+      radial-gradient(1100px 720px at 10% -12%, rgba(56, 189, 248, 0.10), transparent 62%),
+      radial-gradient(1000px 680px at 102% -6%, rgba(129, 140, 248, 0.10), transparent 60%),
+      radial-gradient(900px 700px at 50% 118%, rgba(168, 85, 247, 0.07), transparent 62%),
+      var(--bg-core);
+    user-select: text; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header, footer {
+    padding: 9px 16px; display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(180deg, rgba(17, 28, 45, 0.92) 0%, rgba(9, 15, 26, 0.88) 100%);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  header { border-bottom: 1px solid var(--line-soft); flex-wrap: wrap; }
+  footer { border-top: 1px solid var(--line-soft); }
+  #title {
+    font-weight: 700; letter-spacing: .05em; flex: 1; color: var(--text-1);
+    font-size: 15.5px; min-width: 140px; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+  .badge {
+    font-size: 11px; color: #7DD3FC; font-weight: 700; letter-spacing: .08em;
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(129, 140, 248, 0.16));
+    border: 1px solid rgba(129, 140, 248, 0.38); border-radius: 999px; padding: 3px 11px;
+  }
+
+  /* Zoom & toolbar */
+  .zoom-group {
+    display: inline-flex; align-items: center; margin-left: 6px; overflow: hidden;
+    background: var(--surface-lo); border: 1px solid var(--line-mid); border-radius: 10px;
+  }
+  .zoom-btn {
+    background: transparent; color: var(--cyan); border: none; border-radius: 0;
+    padding: 4px 10px; font-size: 15px; font-weight: 800; cursor: pointer; line-height: 1;
+  }
+  .zoom-btn:hover { background: rgba(56, 189, 248, 0.14); color: var(--text-1); }
+  #zoom-lbl {
+    font-size: 12px; font-weight: 700; color: var(--text-2); padding: 0 8px;
+    min-width: 48px; text-align: center; cursor: pointer; user-select: none;
+  }
+  #zoom-lbl:hover { color: var(--cyan); }
+  .hdr-sep { width: 1px; height: 22px; background: var(--line-mid); margin: 0 10px; }
+
+  #btn-reset {
+    background: var(--surface-lo); color: #9ADFFF; border: 1px solid var(--line-mid);
+    padding: 5px 12px; font-weight: 600;
+  }
+  #btn-reset:hover { background: #16273D; border-color: var(--cyan); color: var(--text-1); }
+
+  #btn-exit {
+    margin-left: 16px; font-weight: 700; padding: 5px 14px;
+    background: rgba(244, 63, 94, 0.12); color: #FFC7D0;
+    border: 1px solid rgba(244, 63, 94, 0.45);
+  }
+  #btn-exit:hover {
+    background: rgba(244, 63, 94, 0.26); border-color: var(--rose); color: #FFFFFF;
+  }
+
+  #board {
+    flex: 1; overflow: auto; padding: 24px 20px 40px; scroll-behavior: smooth;
+    zoom: 1.1; /* Default 110% for comfortable reading */
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px) scale(0.995); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ── Solution cards: layered 3D surface + bottom lip ── */
+  .card {
+    max-width: 980px; margin: 0 auto 20px; padding: 22px 26px;
+    border-radius: var(--radius-card); line-height: 1.75; font-size: 18px; color: var(--text-2);
+    overflow-wrap: break-word; word-break: normal;
+    background: linear-gradient(145deg, #111C2D 0%, #0B1320 55%, #090F1A 100%);
+    border: 1px solid var(--line-soft);
+    border-bottom: 4px solid rgba(56, 189, 248, 0.35);
+    box-shadow: var(--shadow-3d);
+    animation: fadeInUp 0.28s var(--ease-out);
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 22px; font-weight: 700; letter-spacing: 0.2px;
+    line-height: 1.4; color: var(--text-1);
+  }
+  .card p { margin: .5em 0; }
+  .card ul, .card ol { margin: .5em 0 .5em 1.4em; padding: 0; }
+  .card li { margin: .3em 0; }
+  .card strong, .card b { color: var(--text-1); font-weight: 700; }
+  .card a { color: #7DD3FC; }
+  .card code {
+    background: #0A1D30; color: #7CE0FF; padding: 2px 7px; border-radius: 6px;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: 15px;
+    border: 1px solid rgba(56, 189, 248, 0.18);
+  }
+  .code-block {
+    background: #040B14; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 14px;
+    padding: 16px 18px; margin: 12px 0; overflow-x: auto;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: 14.5px;
+    color: #C9E5FF; line-height: 1.65; white-space: pre;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.45);
+  }
+  table.md-table {
+    width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 16px;
+    border-radius: 12px; overflow: hidden;
+  }
+  table.md-table th, table.md-table td {
+    border: 1px solid rgba(148, 163, 184, 0.16); padding: 10px 14px; text-align: left;
+  }
+  table.md-table th {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.14), rgba(129, 140, 248, 0.14));
+    color: #BAE6FD; font-weight: 700; letter-spacing: .02em;
+  }
+  table.md-table tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
+  .dm { overflow-x: auto; padding: 10px 0; font-size: 19px; }
+  .status {
+    text-align: center; color: var(--text-3); margin-top: 18vh; font-size: 16px;
+    white-space: pre-line; line-height: 1.8;
+  }
+
+  button {
+    background: linear-gradient(180deg, #14243A 0%, #0C1826 100%);
+    color: #BFE6FF; border: 1px solid rgba(148, 163, 184, 0.26); border-radius: 10px;
+    padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+    transition: all 0.22s var(--ease-out);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  button:hover:not(:disabled) {
+    background: linear-gradient(180deg, #1B3049 0%, #10233A 100%);
+    border-color: var(--cyan); color: var(--text-1); transform: translateY(-1px);
+  }
+  button:active:not(:disabled) { transform: translateY(0); }
+  button:disabled { opacity: .35; cursor: default; box-shadow: none; }
+  #prog { color: var(--text-3); font-size: 12.5px; flex: 1; letter-spacing: .01em; }
+
+  /* ── Quiz options: soft semantic surfaces + trailing glyph ── */
+  .quiz-opt {
+    display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
+    margin: 10px 0; padding: 14px 18px; font-size: 18px; font-weight: 500;
+    color: var(--text-2); cursor: pointer; border-radius: 16px;
+    background: linear-gradient(160deg, #101F32 0%, #0A1421 100%);
+    border: 1px solid var(--line-soft);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: all 0.22s var(--ease-out);
+  }
+  .quiz-opt:hover:not(.locked) {
+    background: linear-gradient(160deg, #14263C 0%, #0C1A29 100%);
+    border-color: rgba(56, 189, 248, 0.55);
+    transform: translateX(3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .quiz-opt.locked { cursor: default; }
+  .quiz-key {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 9px; font-size: 14px; font-weight: 700;
+    background: #04121E; border: 1px solid var(--line-mid); color: var(--cyan);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .quiz-opt::after {
+    margin-left: auto; font-size: 19px; font-weight: 800; line-height: 1;
+    opacity: 0; transform: scale(0.7); transition: all 0.25s var(--ease-out);
+  }
+  .quiz-opt.correct {
+    background: rgba(16, 185, 129, 0.16); border-color: var(--emerald); color: #A7F3D0;
+  }
+  .quiz-opt.correct .quiz-key { background: var(--emerald); color: #052E22; border-color: var(--emerald); }
+  .quiz-opt.correct::after { content: "✓"; color: #6EE7B7; opacity: 1; transform: scale(1); }
+  .quiz-opt.wrong {
+    background: rgba(244, 63, 94, 0.16); border-color: var(--rose); color: #FECDD3;
+  }
+  .quiz-opt.wrong .quiz-key { background: var(--rose); color: #FFFFFF; border-color: var(--rose); }
+  .quiz-opt.wrong::after { content: "✕"; color: #FDA4AF; opacity: 1; transform: scale(1); }
+
+  /* ── Insight callout: amber / royal violet. Never red or green. ── */
+  .quiz-explain, .unified-explanation-box, .chart-insight {
+    margin-top: 18px; padding: 18px 22px; border-radius: 14px;
+    font-size: 17px; line-height: 1.7; color: #F1F5F9;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(245, 158, 11, 0.10) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.28);
+    border-left: 4px solid var(--violet);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 30px rgba(0, 0, 0, 0.42);
+    animation: fadeIn 0.28s var(--ease-out);
+  }
+  .unified-explanation-box { display: none; }
+  .unified-explanation-box.correct,
+  .unified-explanation-box.incorrect {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(245, 158, 11, 0.10) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.28);
+    border-left: 4px solid var(--violet);
+  }
+  .explain-head {
+    display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+    letter-spacing: .04em; color: #FBBF24;
+    background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.34);
+  }
+  .explain-verdict {
+    font-weight: 700; font-size: 17px; margin-bottom: 8px; letter-spacing: .01em;
+  }
+  .explain-body { margin-top: 4px; line-height: 1.75; font-size: 17px; color: var(--text-1); }
+  .verdict-header {
+    font-weight: 700; font-size: 16px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .verdict-header.correct { color: #C084FC; }
+  .verdict-header.incorrect { color: #FBBF24; }
+
+  .chart-insight { margin-top: 14px; font-size: 16px; }
+  .chart-insight .explain-head { color: #C084FC; background: rgba(168, 85, 247, 0.14); border-color: rgba(168, 85, 247, 0.34); }
+
+  /* ── 3D elevated flashcards with anti-aliased corners ── */
+  .flash-wrap { max-width: 760px; margin: 3vh auto; cursor: pointer; }
+  .flash-wrap.card {
+    padding: 0; background: none; border: none; box-shadow: none; animation: none;
+  }
+  .flash-box {
+    min-height: 320px; display: flex; flex-direction: column; justify-content: center;
+    align-items: center; text-align: center; padding: 38px 34px;
+    border-radius: var(--radius-card);
+    background: linear-gradient(145deg, #111C2D 0%, #0B1320 55%, #090F1A 100%);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-bottom: 4px solid rgba(56, 189, 248, 0.35);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 8px 20px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: all 0.25s var(--ease-out);
+    will-change: transform;
+  }
+  .flash-wrap:hover .flash-box { transform: translateY(-4px) scale(1.005); }
+  .flash-box.back {
+    background: linear-gradient(145deg, #0D2329 0%, #09171E 100%);
+    border: 1px solid rgba(20, 184, 166, 0.45);
+    border-bottom: 4px solid var(--teal);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 8px 20px rgba(0, 0, 0, 0.5),
+                0 0 34px rgba(20, 184, 166, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+  .flash-tag {
+    margin-bottom: 20px; padding: 5px 15px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #7DD3FC;
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.20), rgba(129, 140, 248, 0.20));
+    border: 1px solid rgba(129, 140, 248, 0.40);
+  }
+  .flash-box.back .flash-tag {
+    color: #5EEAD4;
+    background: linear-gradient(90deg, rgba(20, 184, 166, 0.22), rgba(52, 211, 153, 0.18));
+    border-color: rgba(20, 184, 166, 0.45);
+  }
+  .flash-text {
+    width: 100%; overflow-x: auto; overflow-y: hidden;
+    font-size: 29px; font-weight: 600; letter-spacing: 0.2px; line-height: 1.5;
+    color: var(--text-1);
+  }
+  .flash-box.back .flash-text { font-weight: 500; color: #E2E8F0; }
+  .flash-text b, .flash-text strong { font-weight: 700; color: var(--text-1); }
+  .flash-text .katex { font-size: 1.3em !important; }
+  .flash-text .katex-display { margin: 0.5em 0 !important; }
+  .flash-hint {
+    margin-top: 26px; padding-top: 13px; width: 82%;
+    font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: var(--text-3);
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  /* ── Mindmap: multi-branch semantic palette ── */
+  .mm-canvas {
+    width: 100%; overflow-x: auto; padding: 20px 10px 30px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .mm-root-box {
+    position: relative; z-index: 2; padding: 14px 32px; border-radius: 16px;
+    font-size: 20px; font-weight: 700; letter-spacing: .02em; text-align: center;
+    color: #FFFFFF; border: 1px solid rgba(129, 140, 248, 0.55);
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 34px rgba(99, 102, 241, 0.30),
+                inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+  .mm-trunk {
+    width: 2.5px; height: 30px;
+    background: linear-gradient(180deg, #7C3AED, rgba(148, 163, 184, 0.35));
+  }
+  .mm-branches {
+    display: flex; flex-direction: row; justify-content: space-between; align-items: stretch;
+    gap: 14px; position: relative; padding-top: 22px; width: 100%; flex-wrap: nowrap;
+  }
+  .mm-col {
+    flex: 1 1 0; min-width: 185px; display: flex; flex-direction: column;
+    align-items: center; position: relative; --bc: #38BDF8;
+  }
+  .mm-col.b1 { --bc: #38BDF8; }
+  .mm-col.b2 { --bc: #34D399; }
+  .mm-col.b3 { --bc: #A78BFA; }
+  .mm-col.b4 { --bc: #FBBF24; }
+  .mm-col.b5 { --bc: #FB7185; }
+  .mm-col::before {
+    content: ""; position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    width: 2.5px; height: 22px; background: var(--bc); opacity: 0.65;
+  }
+  .mm-col::after {
+    content: ""; position: absolute; top: -22px; left: 0; right: 0;
+    height: 2.5px; background: var(--bc); opacity: 0.65;
+  }
+  .mm-col:first-child::after { left: 50%; }
+  .mm-col:last-child::after { right: 50%; }
+  .mm-col:only-child::after { display: none; }
+
+  .mm-branch-head {
+    width: 100%; position: relative; padding: 11px 15px; border-radius: 14px;
+    text-align: center; font-size: 16.5px; font-weight: 700; line-height: 1.4;
+    transition: all 0.25s var(--ease-out);
+  }
+  .mm-branch-head:hover { transform: translateY(-3px); }
+  .mm-branch-head.b1 {
+    background: linear-gradient(160deg, #123049 0%, #0C2538 100%);
+    border: 1px solid #38BDF8; color: #E0F2FE;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  .mm-branch-head.b2 {
+    background: linear-gradient(160deg, #0F3630 0%, #0A2924 100%);
+    border: 1px solid #34D399; color: #D1FAE5;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(52, 211, 153, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  .mm-branch-head.b3 {
+    background: linear-gradient(160deg, #291E4A 0%, #1E1638 100%);
+    border: 1px solid #A78BFA; color: #EDE9FE;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(167, 139, 250, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  .mm-branch-head.b4 {
+    background: linear-gradient(160deg, #38290F 0%, #2A1F0D 100%);
+    border: 1px solid #FBBF24; color: #FEF3C7;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(251, 191, 36, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  .mm-branch-head.b5 {
+    background: linear-gradient(160deg, #3B1830 0%, #2D1222 100%);
+    border: 1px solid #FB7185; color: #FFE4E6;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(251, 113, 133, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  .mm-branch-num {
+    display: inline-block; vertical-align: middle; margin-right: 7px;
+    padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
+  }
+  .mm-branch-head.b1 .mm-branch-num { background: #38BDF8; color: #04121E; }
+  .mm-branch-head.b2 .mm-branch-num { background: #34D399; color: #052E22; }
+  .mm-branch-head.b3 .mm-branch-num { background: #A78BFA; color: #1A1030; }
+  .mm-branch-head.b4 .mm-branch-num { background: #FBBF24; color: #2A1F0D; }
+  .mm-branch-head.b5 .mm-branch-num { background: #FB7185; color: #2D1222; }
+
+  .mm-leaf-list {
+    width: 93%; display: flex; flex-direction: column; gap: 10px;
+    margin-top: 2px; padding-top: 14px; padding-left: 16px;
+    border-left: 2px solid var(--bc);
+  }
+  .mm-leaf {
+    position: relative; padding: 10px 14px; border-radius: 12px; overflow: hidden;
+    font-size: 15.5px; line-height: 1.6; color: var(--text-2); text-align: left;
+    overflow-wrap: anywhere; word-break: break-word;
+    background: linear-gradient(160deg, #101D2E 0%, #0A1421 100%);
+    border: 1px solid var(--bc);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .mm-leaf::before {
+    content: ""; position: absolute; left: -17px; top: 18px;
+    width: 16px; height: 2.5px; background: var(--bc); opacity: 0.65;
+  }
+  .mm-leaf::after {
+    content: ""; position: absolute; left: -4px; top: 15px;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--bc);
+    box-shadow: 0 0 8px var(--bc);
+  }
+  .mm-subleaf-list {
+    margin-top: 7px; padding-left: 12px; display: flex; flex-direction: column; gap: 4px;
+    border-left: 1px dashed var(--bc);
+  }
+  .mm-subleaf { font-size: 14px; color: var(--text-3); padding: 2px 0; text-align: left; }
+  .mm-subleaf::before { content: "•"; color: var(--bc); margin-right: 8px; font-weight: 700; }
+
+  /* ── Overflow guards: long words and display math must never bleed out ── */
+  .dm, .code-block { overflow-x: auto; overflow-y: hidden; }
+  .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+  .katex-display > .katex { white-space: normal; }
+  .mm-branch-head, .mm-leaf, .mm-subleaf { overflow-wrap: break-word; word-break: normal; }
+  .flash-text, .card p, .card li, .quiz-opt, .explain-body, .mm-branch-head {
+    overflow-wrap: break-word; word-break: normal;
+  }
+  .mm-leaf .katex { font-size: 0.85em; }
+  .mm-leaf .katex-display { margin: 5px 0; overflow-x: hidden; }
+  .mm-subleaf .katex { font-size: 0.88em; }
+  .mm-subleaf .katex-display { display: inline-block; margin: 0; text-align: left; overflow-x: hidden; }
+
+  /* Slim, unobtrusive scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.22); border-radius: 999px;
+    border: 2px solid transparent; background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.4); background-clip: padding-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* ── Math step rows ── */
+  li.math-step-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 12px; margin: 6px 0; list-style: none; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 3px solid rgba(56, 189, 248, 0.35);
+    transition: all 0.2s var(--ease-out);
+  }
+  li.math-step-row:hover {
+    background: rgba(56, 189, 248, 0.07);
+    border-left-color: var(--cyan);
+    transform: translateX(2px);
+  }
+  .math-step-content { flex: 1; overflow-x: auto; }
+  .line-qmark {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: 800;
+    user-select: none; cursor: pointer; transition: all 0.2s var(--ease-out);
+    color: var(--text-3); background: rgba(56, 189, 248, 0.10);
+    border: 1px solid rgba(56, 189, 248, 0.30);
+  }
+  .line-qmark:hover {
+    background: var(--cyan); color: #04121E; border-color: #FFFFFF;
+    transform: scale(1.12); box-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
+  }
+
+  /* ── Interactive SVG Circuits, Diagrams & Coordinate Grids ── */
+  .svg-diagram-box {
+    background: radial-gradient(circle at center, #0d1b2a 0%, #060d18 100%);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 14px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: auto;
+    box-shadow: inset 0 0 24px rgba(0, 212, 255, 0.06);
+  }
+  .svg-diagram-box svg {
+    width: 100%;
+    max-width: 1000px;
+    height: auto;
+    min-height: 240px;
+  }
+  .svg-diagram-box .gen-chip {
+    align-self: flex-start;
+    margin: 10px 2px 0;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #94A3B8;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(12, 28, 43, 0.7);
+  }
+  .svg-diagram-box .svg-error {
+    color: #FBBF24;
+    font-size: 14px;
+    padding: 18px 8px;
+  }
+  .coord-grid-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 14px 0;
+  }
+  .coord-canvas {
+    background: #07111e;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 12px;
+    cursor: crosshair;
+    max-width: 100%;
+  }
+  .coord-readout {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #38bdf8;
+    font-family: "Cascadia Code", Consolas, monospace;
+  }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span id="title">STUDY STATION</span>
+    <span id="mode-badge" class="badge">BOARD</span>
+    <span id="chip" class="badge" style="display:none"></span>
+
+    <!-- Text / Board Zoom Control -->
+    <div class="zoom-group" title="Zoom In / Out [Ctrl + / Ctrl - / Click % to Reset]">
+      <button id="btn-zoom-out" class="zoom-btn" title="Zoom Out [Ctrl -]">−</button>
+      <span id="zoom-lbl" title="Click to reset zoom [Ctrl + 0]">110%</span>
+      <button id="btn-zoom-in" class="zoom-btn" title="Zoom In [Ctrl +]">+</button>
+    </div>
+
+    <button id="btn-reset" title="Clear current board content [Ctrl+R]">↻ Reset Board</button>
+    <div class="hdr-sep"></div>
+    <button id="btn-exit" title="Leave Study Mode and return to normal HUD [F8]">✕ Quit Study Mode</button>
+  </header>
+  <main id="board"><div class="status">Ask a question to start.</div></main>
+  <footer>
+    <span id="prog"></span>
+    <button id="btn-prev" style="display:none">◂ Prev</button>
+    <button id="btn-explain" disabled>Explain this step</button>
+    <button id="btn-next" disabled>Next step ▸</button>
+  </footer>
+</div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ---- Board Zoom Controller ---- */
+let currentZoom = 110;
+try {
+  const savedZ = parseInt(localStorage.getItem("jarvis_study_zoom") || "110", 10);
+  if (savedZ >= 70 && savedZ <= 200) currentZoom = savedZ;
+} catch (e) {}
+
+function applyZoom(val) {
+  currentZoom = Math.max(70, Math.min(200, Math.round(val / 10) * 10));
+  $("board").style.zoom = (currentZoom / 100).toFixed(2);
+  $("zoom-lbl").textContent = `${currentZoom}%`;
+  try { localStorage.setItem("jarvis_study_zoom", String(currentZoom)); } catch (e) {}
+}
+applyZoom(currentZoom);
+
+$("btn-zoom-in").onclick = () => applyZoom(currentZoom + 10);
+$("btn-zoom-out").onclick = () => applyZoom(currentZoom - 10);
+$("zoom-lbl").onclick = () => applyZoom(110);
+
+function repairCorruptedLatex(str) {
+  let s = String(str || "")
+    .replace(/\x0c(rac|orall|lat)/g, "\\f$1")
+    .replace(/\x08(eta|ar|inom|egin|f)/g, "\\b$1")
+    .replace(/\t(an|heta|au|ext|imes|o)/g, "\\t$1")
+    .replace(/\r(ho|ight)/g, "\\r$1")
+    .replace(/\n(eq|u|abla)/g, "\\n$1");
+  // Fix missing backslash or shorthand frac57 -> \frac{5}{7}
+  s = s.replace(/(?<!\\)\bfrac\s*\{/g, "\\frac{");
+  s = s.replace(/(?:\\)?\bfrac\s*([0-9০-৯a-zA-Z])\s*([0-9০-৯a-zA-Z])(?![0-9০-৯a-zA-Z\}])/g, "\\frac{$1}{$2}");
+  return s;
+}
+
+function convertPlainMathToTex(expr) {
+  let t = expr.trim();
+  t = t.replace(/\b(sin|cos|tan|cot|sec|csc|cosec)\s*\^\s*\{\s*-1\s*\}/gi, "\\$1^{-1}");
+  t = t.replace(/\b(sin|cos|tan|cot|sec|csc|cosec)\s*\^\s*-1/gi, "\\$1^{-1}");
+  t = t.replace(/\b(sin|cos|tan|cot|sec|csc|cosec)\b/gi, "\\$1");
+  t = t.replace(/\bsqrt\s*\(([^()]+)\)/gi, "\\sqrt{$1}");
+  t = t.replace(/([a-zA-Z])(\d+)\b/g, "$1_{$2}");
+  t = t.replace(/\^\s*(-?\d+|\([^()]+\))/g, (_m, p1) => `^{${p1.replace(/^\(\vert{}\)$/g, "")}}`);
+  for (let pass = 0; pass < 2; pass++) {
+    t = t.replace(/\(([^()]+)\)\s*\/\s*\(([^()]+)\)/g, "\\frac{$1}{$2}");
+    t = t.replace(/([a-zA-Z0-9_{}^\\]+)\s*\/\s*\(([^()]+)\)/g, "\\frac{$1}{$2}");
+    t = t.replace(/\(([^()]+)\)\s*\/\s*([a-zA-Z0-9_{}^\\]+)/g, "\\frac{$1}{$2}");
+    t = t.replace(/([a-zA-Z0-9_{}^]+)\s*\/\s*([a-zA-Z0-9_{}^]+)/g, "\\frac{$1}{$2}");
+  }
+  return t;
+}
+
+function autoLatexFormula(raw) {
+  let s = repairCorruptedLatex(raw).trim();
+  if (!s || /\$|\\\[|\\\(/.test(s)) return s;
+  s = s.replace(/\(([A-Za-z0-9_+\-*/^=\s\\]+)\)/g, (full, inner) => {
+    if (/[=^\/]/.test(inner) && /[A-Za-z0-9]/.test(inner)) {
+      return `($${convertPlainMathToTex(inner)}$)`;
+    }
+    return full;
+  });
+  const looksLikePureMath =
+    !/[\u0980-\u09FF]/.test(s) && s.length < 95 &&
+    (/(\^|\b(?:sin|cos|tan|cot|sec|cosec|ln|log|lim)\b|[a-zA-Z0-9_)\]]\s*\/\s*[a-zA-Z0-9_(\[])/.test(s));
+  if (looksLikePureMath && !s.includes("$")) {
+    return `$$${convertPlainMathToTex(s)}$$`;
+  }
+  return s;
+}
+
+const inline = (s) => esc(autoLatexFormula(
+    String(s || "")
+      .replace(/\*\*\[(?:লাইন|Line)\s*[০-৯0-9]+\]\*\*\s*/g, "")
+      .replace(/\[(?:লাইন|Line)\s*[০-৯0-9]+\]\s*/g, "")
+  ))
+  .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+  .replace(/`([^`]+)`/g, "<code>$1</code>");
+
+/* Mindmap labels: allow the line to break right after a separator (_ / - , etc.)
+   so a long run-on token wraps at its separator instead of splitting a word. */
+const mindInline = (raw) => {
+  const html = inline(raw);
+  if (/\$|\\/.test(html)) return html;              // leave LaTeX spans untouched
+  return html.replace(/([_/\-–—])(?=[^\s<])/g, "$1<wbr>");
+};
+
+const MATH = { throwOnError: false, ignoredClasses: ["svg-diagram-box", "coord-grid-wrap"], delimiters: [
+  { left: "$$", right: "$$", display: true }, { left: "[", right: "]", display: true },
+  { left: "$", right: "$", display: false }, { left: "\\(", right: "\\)", display: false }] };
+
+let bridge = null, activeMode = "board";
+let sections = [], shown = 0;
+let quizState = null;
+let flashState = null;
+let lastSolution = null, lastQuiz = null, lastFlashcards = null;
+
+function setModeBadge(text) { $("mode-badge").textContent = text; }
+function typeset(el) {
+  if (typeof renderMathInElement !== "undefined") {
+    try { renderMathInElement(el, MATH); } catch (e) {}
+  }
+}
+
+/* ---- Diagrams: model-written SVG is sanitised (allow-list) before it reaches the DOM ---- */
+const SVG_NS = "http://www.w3.org/2000/svg";
+const SVG_TAGS = new Set(["svg", "g", "defs", "symbol", "use", "marker", "path", "line", "polyline",
+  "polygon", "rect", "circle", "ellipse", "text", "tspan", "textpath", "title", "desc",
+  "lineargradient", "radialgradient", "stop", "clippath", "mask", "pattern",
+  // filter primitives (soft shadows / glow). NEVER feimage, image, foreignobject, script, style, a, animate*, set.
+  "filter", "fegaussianblur", "feoffset", "femerge", "femergenode", "fedropshadow",
+  "fecolormatrix", "fecomposite", "feflood", "feturbulence", "fedisplacementmap", "feblend"]);
+const SVG_MAX_CHARS = 300000;
+
+function scrubSvgAttrs(el) {
+  for (const a of Array.from(el.attributes)) {
+    const name = a.name.toLowerCase(), val = a.value;
+    let bad = name.startsWith("on");                                   // onload=, onclick=, ...
+    if (!bad && (name === "href" || name === "xlink:href")) bad = !/^\s*#/.test(val);  // local refs only
+    if (!bad && /javascript:|data:text\/html|<\s*script/i.test(val)) bad = true;
+    if (!bad && /url\s*\(/i.test(val)) {                               // url(#id) only, never remote
+      bad = Array.from(val.matchAll(/url\s*\(\s*(['"]?)\s*([^)'"]*)/gi)).some((mm) => !mm[2].trim().startsWith("#"));
+    }
+    if (!bad && name === "style" && /@import|expression\s*\(|behavior\s*:/i.test(val)) bad = true;
+    if (bad) el.removeAttribute(a.name);
+  }
+}
+
+function sanitizeSvg(raw) {
+  raw = String(raw || "");
+  if (!raw.trim() || raw.length > SVG_MAX_CHARS) return "";
+  // text/html parsing is forgiving (unescaped &, stray entities) and never runs scripts.
+  const doc = new DOMParser().parseFromString("<!doctype html><body>" + raw, "text/html");
+  const root = doc.body.querySelector("svg");
+  if (!root) return "";
+  const walk = (node) => {
+    for (const child of Array.from(node.children)) {
+      if (child.namespaceURI !== SVG_NS || !SVG_TAGS.has(child.localName.toLowerCase())) { child.remove(); continue; }
+      scrubSvgAttrs(child);
+      walk(child);
+    }
+  };
+  scrubSvgAttrs(root);
+  walk(root);
+  if (!root.getAttribute("viewBox")) {
+    const w = parseFloat(root.getAttribute("width")), h = parseFloat(root.getAttribute("height"));
+    root.setAttribute("viewBox", w > 0 && h > 0 ? `0 0 ${w} ${h}` : "0 0 760 420");
+  }
+  root.removeAttribute("width"); root.removeAttribute("height");   // CSS sizes it from the viewBox
+  root.setAttribute("role", "img");
+  return root.outerHTML;
+}
+
+function svgBlockHtml(raw) {
+  const clean = sanitizeSvg(raw);
+  if (!clean) {
+    console.warn("[board] SVG block rejected (empty, too large, or no <svg> root)");
+    return `<div class="svg-diagram-box"><div class="svg-error">⚠ ডায়াগ্রামটি রেন্ডার করা যায়নি (SVG অবৈধ বা অনিরাপদ)।</div></div>`;
+  }
+  const gen = clean.match(/^<svg[^>]*\sdata-jv-generated="([a-z]+)"/);
+  const chip = gen
+    ? `<div class="gen-chip">${gen[1] === "draft" ? "⚠ খসড়া মান · " : ""}AI-generated schematic — verify with your textbook · AI-আঁকা চিত্র, পাঠ্যবইয়ের সঙ্গে মিলিয়ে নিও</div>`
+    : "";
+  return `<div class="svg-diagram-box">${clean}${chip}</div>`;
+}
+
+function blocks(src) {
+  const maths = [], plots = [], codes = [], svgs = [], coords = [];
+  src = String(src || "").replace(/```svg\s*([\s\S]*?)```/gi, (_m, s) => {
+    svgs.push(s.trim()); return `\n\u0004${svgs.length - 1}\u0004\n`;
+  });
+  src = String(src || "").replace(/```coord\s*([\s\S]*?)```/gi, (_m, c) => {
+    coords.push(c.trim()); return `\n\u0005${coords.length - 1}\u0005\n`;
+  });
+  src = String(src || "").replace(/```plot\s*([\s\S]*?)```/g, (_m, j) => {
+    plots.push(j.trim()); return `\n\u0002${plots.length - 1}\u0002\n`;
+  });
+  src = src.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_m, _lang, code) => {
+    codes.push(code.replace(/\n$/, "")); return `\n\u0003${codes.length - 1}\u0003\n`;
+  });
+  src = src.replace(/\$\$[\s\S]+?\$\$/g, (m) => {
+    maths.push(m); return `\n\u0001${maths.length - 1}\u0001\n`;
+  });
+
+  const out = []; let para = [], list = null, tbl = [];
+  const flushP = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
+  const flushL = () => {
+    if (!list) return;
+    const itemsHtml = list.i.map((x) => {
+      const m = String(x).match(/\[\[L:([০-৯0-9]+)\]\]\s*$/);
+      if (m) {
+        const lineNum = m[1];
+        const cleanX = String(x).replace(/\s*\[\[L:[০-৯0-9]+\]\]\s*$/, "");
+        return `<li class="math-step-row"><div class="math-step-content">${inline(cleanX)}</div><span class="line-qmark" data-line="লাইন ${lineNum}" onclick="askLineExplain(this)" title="লাইন ${lineNum}-এর ব্যাখ্যা দেখুন">?</span></li>`;
+      }
+      return `<li>${inline(x)}</li>`;
+    }).join("");
+    out.push(`<${list.t}>${itemsHtml}</${list.t}>`);
+    list = null;
+  };
+  const flushT = () => {
+    if (!tbl.length) return;
+    const rows = tbl.filter((r) => !/^\|?[\s\-:|]+\|?$/.test(r));
+    if (rows.length) {
+      let h = '<table class="md-table">';
+      rows.forEach((r, idx) => {
+        const cells = r.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+        const tag = idx === 0 ? "th" : "td";
+        h += `<tr>${cells.map((c) => `<${tag}>${inline(c)}</${tag}>`).join("")}</tr>`;
+      });
+      h += "</table>";
+      out.push(h);
+    }
+    tbl = [];
+  };
+
+  for (const raw of src.split("\n")) {
+    const line = raw.trim(); let m;
+    if (!line) { flushP(); flushL(); flushT(); continue; }
+    if ((m = line.match(/^\u0001(\d+)\u0001$/))) { flushP(); flushL(); flushT(); out.push(`<div class="dm">${esc(maths[+m[1]])}</div>`); continue; }
+    if ((m = line.match(/^\u0002(\d+)\u0002$/))) { flushP(); flushL(); flushT(); out.push(`<div class="plot" data-i="${m[1]}"></div>`); continue; }
+    if ((m = line.match(/^\u0003(\d+)\u0003$/))) { flushP(); flushL(); flushT(); out.push(`<pre class="code-block">${esc(codes[+m[1]])}</pre>`); continue; }
+    if ((m = line.match(/^\u0004(\d+)\u0004$/))) { flushP(); flushL(); flushT(); out.push(svgBlockHtml(svgs[+m[1]])); continue; }
+    if ((m = line.match(/^\u0005(\d+)\u0005$/))) { flushP(); flushL(); flushT(); out.push(`<div class="coord-grid-wrap"><canvas class="coord-canvas" width="640" height="440" data-i="${m[1]}"></canvas><div class="coord-readout">মাউস গ্রিডের ওপর নিন: (x: 0.00, y: 0.00)</div></div>`); continue; }
+    if (line.startsWith("|") && line.endsWith("|")) { flushP(); flushL(); tbl.push(line); continue; }
+    flushT();
+    if ((m = line.match(/^[-*•]\s+(.*)/))) { flushP(); if (!list || list.t !== "ul") { flushL(); list = { t: "ul", i: [] }; } list.i.push(m[1]); continue; }
+    if ((m = line.match(/^\d+[.)]\s+(.*)/))) { flushP(); if (!list || list.t !== "ol") { flushL(); list = { t: "ol", i: [] }; } list.i.push(m[1]); continue; }
+    flushL(); para.push(line);
+  }
+  flushP(); flushL(); flushT();
+  return { html: out.join(""), plots, coords };
+}
+
+function parse(md) {
+  const parts = [];
+  let cur = { title: "ধাপ ১: সূচনা ও মূল ধারণা", body: [] }, started = false;
+  for (const line of String(md || "").split("\n")) {
+    const m = line.match(/^##\s+(.*)/);
+    if (m) {
+      if (started || cur.body.join("").trim()) parts.push(cur);
+      cur = { title: m[1].trim(), body: [] };
+      started = true;
+      continue;
+    }
+    if (!started && /^#\s+/.test(line)) continue;
+    cur.body.push(line);
+  }
+  if (cur.title || cur.body.join("").trim()) parts.push(cur);
+  return parts.filter((p) => p.title || p.body.join("").trim());
+}
+
+function askLineExplain(badgeEl) {
+  const label = (badgeEl && badgeEl.dataset && badgeEl.dataset.line) ? badgeEl.dataset.line : "এই লাইন";
+  const row = badgeEl && badgeEl.closest ? badgeEl.closest("li") : null;
+  const contentEl = row ? row.querySelector(".math-step-content") : null;
+  const lineContent = contentEl ? contentEl.textContent.trim() : "";
+  send("explain_line", { label: label, content: lineContent });
+}
+
+const CHART_PALETTE = ["#38BDF8", "#A78BFA", "#34D399", "#FBBF24", "#FB7185", "#818CF8"];
+
+function drawPlot(div, raw) {
+  if (typeof Plotly === "undefined") { div.textContent = "(plot library unavailable)"; return; }
+  try {
+    const s = JSON.parse(raw);
+    const traces = s.traces || (Array.isArray(s.labels) && Array.isArray(s.values)
+      ? [{ x: s.labels, y: s.values, type: s.type || "bar", name: s.name }]
+      : [{ x: s.x, y: s.y, type: s.type, name: s.name }]);
+    const axis = {
+      gridcolor: "rgba(148, 163, 184, 0.12)", griddash: "dot",
+      zerolinecolor: "rgba(148, 163, 184, 0.28)", color: "#94A3B8",
+      tickfont: { color: "#94A3B8", size: 12 },
+    };
+    const styled = traces.map((t, i) => {
+      const color = (t.marker && t.marker.color) || t.color || CHART_PALETTE[i % CHART_PALETTE.length];
+      const out = { mode: "lines", line: { width: 2.6, color }, color, ...t };
+      if (!out.type && t.labels !== undefined) out.type = "bar";
+      if (out.type === "bar") {
+        out.marker = { ...(t.marker || {}), color, cornerradius: 8 };
+      }
+      return out;
+    });
+    Plotly.newPlot(div, styled, {
+      title: { text: s.title || "", font: { size: 16, color: "#F8FAFC" } },
+      height: 320, showlegend: traces.length > 1, colorway: CHART_PALETTE, barcornerradius: 8,
+      paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(255,255,255,0.02)",
+      font: { color: "#E2E8F0", size: 13,
+              family: "'Anek Bangla','Hind Siliguri','Inter','Segoe UI',sans-serif" },
+      legend: { orientation: "h", y: -0.2, font: { color: "#CBD5E1" } },
+      margin: { l: 56, r: 20, t: s.title ? 48 : 18, b: 52 },
+      xaxis: { ...axis, title: { text: s.xlabel || "", font: { color: "#94A3B8", size: 12 } } },
+      yaxis: { ...axis, title: { text: s.ylabel || "", font: { color: "#94A3B8", size: 12 } } },
+    }, { displayModeBar: false, responsive: true });
+
+    const insight = s.insight || s.summary || s.note || s.explanation || "";
+    if (insight && div.parentNode && !div.nextElementSibling) {
+      const box = document.createElement("div");
+      box.className = "chart-insight";
+      box.innerHTML = `<div class="explain-head">📊 সারসংক্ষেপ (Insight)</div>` +
+                      `<div class="explain-body">${inline(insight).replace(/\n/g, "<br>")}</div>`;
+      div.parentNode.insertBefore(box, div.nextSibling);
+      typeset(box);
+    }
+  } catch (e) { div.textContent = "(plot unavailable)"; }
+}
+
+
+/* ---- Coordinate grids: expressions are parsed by a tiny recursive-descent parser. ----
+   No eval / new Function, so model-written text can never run as script.
+   Supports + - * / % ^ (and **), unary -, implicit multiplication (2x, 2(x+1)),
+   x, pi, e and sin cos tan asin acos atan sinh cosh tanh sqrt cbrt abs exp ln log(=log10)
+   floor ceil round sign. */
+const COORD_FN = Object.freeze({
+  sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan,
+  sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
+  exp: Math.exp, ln: Math.log, log: Math.log10, floor: Math.floor, ceil: Math.ceil, round: Math.round, sign: Math.sign,
+});
+const COORD_CONST = Object.freeze({ pi: Math.PI, e: Math.E });
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+function compileExpr(src) {
+  const text = String(src || "")
+    .replace(/^\s*y\s*=\s*/i, "")
+    .replace(/[×·]/g, "*").replace(/÷/g, "/").replace(/[−–]/g, "-").replace(/π/g, "pi")
+    .replace(/\*\*/g, "^");
+  if (!text.trim() || text.length > 200) return null;
+
+  const toks = [], re = /\s*(?:(\d+\.?\d*|\.\d+)|([A-Za-z_]\w*)|(\S))/y;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[1] !== undefined) toks.push({ t: "n", v: parseFloat(m[1]) });
+    else if (m[2] !== undefined) toks.push({ t: "i", v: m[2].toLowerCase() });
+    else toks.push({ t: "o", v: m[3] });
+  }
+
+  let p = 0;
+  const isOp = (v) => p < toks.length && toks[p].t === "o" && toks[p].v === v;
+  const fail = () => { throw new Error("bad expression"); };
+
+  function parseExpr() {
+    let l = parseTerm();
+    while (isOp("+") || isOp("-")) {
+      const op = toks[p++].v, a = l, r = parseTerm();
+      l = op === "+" ? (x) => a(x) + r(x) : (x) => a(x) - r(x);
+    }
+    return l;
+  }
+  function parseTerm() {
+    let l = parseUnary();
+    for (;;) {
+      let op;
+      if (isOp("*") || isOp("/") || isOp("%")) op = toks[p++].v;
+      else if (p < toks.length && (toks[p].t === "n" || toks[p].t === "i" || isOp("("))) op = "*";   // implicit
+      else break;
+      const a = l, r = parseUnary();
+      l = op === "*" ? (x) => a(x) * r(x) : op === "/" ? (x) => a(x) / r(x) : (x) => a(x) % r(x);
+    }
+    return l;
+  }
+  function parseUnary() {
+    if (isOp("-")) { p++; const a = parseUnary(); return (x) => -a(x); }
+    if (isOp("+")) { p++; return parseUnary(); }
+    return parsePower();
+  }
+  function parsePower() {
+    const base = parseAtom();
+    if (isOp("^")) { p++; const ex = parseUnary(); return (x) => Math.pow(base(x), ex(x)); }   // right-assoc, -x^2 = -(x^2)
+    return base;
+  }
+  function parseAtom() {
+    const t = toks[p++];
+    if (!t) fail();
+    if (t.t === "n") { const v = t.v; return () => v; }
+    if (t.t === "o" && t.v === "(") { const e = parseExpr(); if (!isOp(")")) fail(); p++; return e; }
+    if (t.t === "i") {
+      if (t.v === "x") return (x) => x;
+      if (hasOwn(COORD_CONST, t.v)) { const v = COORD_CONST[t.v]; return () => v; }
+      if (hasOwn(COORD_FN, t.v)) {
+        const fn = COORD_FN[t.v];
+        if (!isOp("(")) fail();
+        p++; const arg = parseExpr(); if (!isOp(")")) fail(); p++;
+        return (x) => fn(arg(x));
+      }
+    }
+    return fail();
+  }
+
+  try { const f = parseExpr(); return p === toks.length ? f : null; } catch (e) { return null; }
+}
+
+function drawCoordCanvas(canvas, rawJson) {
+  const readout = canvas.parentElement.querySelector(".coord-readout");
+  let spec;
+  try { spec = JSON.parse(rawJson || "{}"); }
+  catch (e) { if (readout) readout.textContent = "⚠ গ্রাফের JSON পড়া যায়নি।"; console.error(e); return; }
+  if (!spec || typeof spec !== "object") spec = {};
+
+  try {
+    const ctx = canvas.getContext("2d");
+    const okRange = (r, d) => (Array.isArray(r) && r.length === 2 && r.every(Number.isFinite) && r[1] > r[0] && r[1] - r[0] <= 2000) ? r : d;
+    const xRange = okRange(spec.x_range, [-10, 10]);
+    const yRange = okRange(spec.y_range, [-10, 10]);
+    const okColor = (c, d) => (typeof c === "string" && /^(#[0-9a-f]{3,8}|[a-z]{3,20}|rgba?\([\d\s.,%]+\))$/i.test(c.trim())) ? c.trim() : d;
+    const num = Number.isFinite;
+
+    const toSX = (x) => ((x - xRange[0]) / (xRange[1] - xRange[0])) * canvas.width;
+    const toSY = (y) => canvas.height - ((y - yRange[0]) / (yRange[1] - yRange[0])) * canvas.height;
+    const toWX = (px) => xRange[0] + (px / canvas.width) * (xRange[1] - xRange[0]);
+    const toWY = (py) => yRange[0] + ((canvas.height - py) / canvas.height) * (yRange[1] - yRange[0]);
+    const niceStep = (span) => {
+      const raw = span / 20, pow = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / pow;
+      return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
+    };
+    const fmt = (v) => String(+v.toFixed(6));
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.14)";
+    ctx.fillStyle = "#94A3B8";
+    ctx.font = "11px Consolas, monospace";
+
+    const sx0 = niceStep(xRange[1] - xRange[0]), sy0 = niceStep(yRange[1] - yRange[0]);
+    for (let k = Math.ceil(xRange[0] / sx0); k * sx0 <= xRange[1] + 1e-9; k++) {
+      const x = k * sx0, sx = toSX(x);
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height); ctx.stroke();
+      if (k !== 0) ctx.fillText(fmt(x), sx - 5, Math.min(canvas.height - 6, Math.max(14, toSY(0) + 14)));
+    }
+    for (let k = Math.ceil(yRange[0] / sy0); k * sy0 <= yRange[1] + 1e-9; k++) {
+      const y = k * sy0, sy = toSY(y);
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy); ctx.stroke();
+      if (k !== 0) ctx.fillText(fmt(y), Math.min(canvas.width - 24, Math.max(6, toSX(0) + 6)), sy + 4);
+    }
+
+    // Principal X & Y axes
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#64748B";
+    ctx.beginPath(); ctx.moveTo(0, toSY(0)); ctx.lineTo(canvas.width, toSY(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(toSX(0), 0); ctx.lineTo(toSX(0), canvas.height); ctx.stroke();
+
+    // Segments / vectors: [[x1,y1],[x2,y2],"label"]
+    (Array.isArray(spec.segments) ? spec.segments : []).slice(0, 200).forEach((seg) => {
+      if (!Array.isArray(seg) || !Array.isArray(seg[0]) || !Array.isArray(seg[1])) return;
+      const [p1, p2, label] = seg;
+      if (![p1[0], p1[1], p2[0], p2[1]].every(num)) return;
+      ctx.strokeStyle = "#F59E0B";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(toSX(p1[0]), toSY(p1[1]));
+      ctx.lineTo(toSX(p2[0]), toSY(p2[1]));
+      ctx.stroke();
+      if (label) {
+        ctx.fillStyle = "#FBBF24";
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillText(String(label).slice(0, 40), (toSX(p1[0]) + toSX(p2[0])) / 2 + 6, (toSY(p1[1]) + toSY(p2[1])) / 2 - 6);
+      }
+    });
+
+    // Functions y = f(x)
+    (Array.isArray(spec.functions) ? spec.functions : []).slice(0, 20).forEach((fnObj, idx) => {
+      fnObj = fnObj || {};
+      const color = okColor(fnObj.color, CHART_PALETTE[idx % CHART_PALETTE.length]);
+      const label = String(fnObj.label || fnObj.expr || "").slice(0, 60);
+      const f = compileExpr(fnObj.expr);
+      if (!f) {
+        ctx.fillStyle = "#FBBF24"; ctx.font = "bold 13px Consolas, monospace";
+        ctx.fillText("⚠ " + label + " (পড়া যায়নি)", 14, 24 + idx * 20);
+        return;
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      let started = false, prevPy = 0;
+      for (let px = 0; px <= canvas.width; px += 2) {
+        const y = f(toWX(px));
+        if (!Number.isFinite(y)) { started = false; continue; }
+        const py = toSY(y);
+        if (!started || Math.abs(py - prevPy) > canvas.height * 1.5) ctx.moveTo(px, py);   // break at asymptotes
+        else ctx.lineTo(px, py);
+        started = true; prevPy = py;
+      }
+      ctx.stroke();
+      if (label) {
+        ctx.fillStyle = color;
+        ctx.font = "bold 13px Consolas, monospace";
+        ctx.fillText(label, 14, 24 + idx * 20);
+      }
+    });
+
+    // Points: [x, y, "label"]
+    (Array.isArray(spec.points) ? spec.points : []).slice(0, 200).forEach((pt) => {
+      if (!Array.isArray(pt)) return;
+      const [x, y, label] = pt;
+      if (!num(x) || !num(y)) return;
+      const sx = toSX(x), sy = toSY(y);
+      ctx.fillStyle = "#F43F5E";
+      ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill();
+      if (label) {
+        ctx.fillStyle = "#FDA4AF";
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillText(String(label).slice(0, 40), sx + 8, sy - 8);
+      }
+    });
+
+    canvas.onmousemove = (ev) => {
+      const r = canvas.getBoundingClientRect();
+      const wx = toWX((ev.clientX - r.left) * (canvas.width / r.width)).toFixed(2);
+      const wy = toWY((ev.clientY - r.top) * (canvas.height / r.height)).toFixed(2);
+      if (readout) readout.textContent = `স্থানাঙ্ক (Coordinates): (x: ${wx}, y: ${wy})`;
+    };
+  } catch (e) { console.error(e); if (readout) readout.textContent = "⚠ গ্রাফ আঁকতে সমস্যা হয়েছে।"; }
+}
+
+function add(i, quiet) {
+  if (i < 0 || i >= sections.length) return;
+  const s = sections[i], el = document.createElement("section");
+  el.className = "card";
+  el.innerHTML = (s.title ? `<h2>${inline(s.title)}</h2>` : "") + s.html;
+  $("board").appendChild(el);
+  typeset(el);
+  el.querySelectorAll(".plot").forEach((d) => drawPlot(d, s.plots[+d.dataset.i]));
+  el.querySelectorAll(".coord-canvas").forEach((c) => drawCoordCanvas(c, (s.coords || [])[+c.dataset.i]));
+  shown = i + 1;
+  if (i === 0) {
+    $("board").scrollTop = 0;
+  } else if (!quiet) {
+    el.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+}
+
+function bar() {
+  const n = sections.length;
+  if (!n || activeMode !== "board") {
+    $("prog").textContent = "";
+    $("btn-prev").style.display = "none";
+    $("btn-prev").disabled = true;
+    $("btn-explain").style.display = "";
+    $("btn-explain").disabled = true;
+    $("btn-next").textContent = "Next step ▸";
+    $("btn-next").disabled = true;
+    return;
+  }
+  $("btn-prev").style.display = shown > 1 ? "" : "none";
+  $("btn-prev").disabled = !(shown > 1);
+  $("btn-explain").style.display = "";
+  $("btn-explain").disabled = !shown;
+  $("prog").textContent = `Step ${shown} / ${n}  ·  [Enter / Space] Next`;
+  $("btn-next").textContent = "Next step ▸";
+  $("btn-next").disabled = !(shown < n);
+}
+
+function quizExplainHTML(isRight, ansIdx, opts, explanation) {
+  const verdict = isRight ? "✓ সঠিক উত্তর!" : `✕ ভুল উত্তর — সঠিক উত্তর: (${ansIdx + 1}) ${opts[ansIdx] || ""}`;
+  const verdictColor = isRight ? "#C084FC" : "#FBBF24";
+  let html = `<div class="explain-head">💡 ব্যাখ্যা (Explanation)</div>` +
+             `<div class="explain-verdict" style="color:${verdictColor}">${inline(verdict)}</div>`;
+  if (explanation) {
+    html += `<div class="explain-body">${inline(explanation).replace(/\n/g, "<br>")}</div>`;
+  }
+  return html;
+}
+
+function renderQuizQuestion() {
+  const st = quizState;
+  if (!st || !st.questions.length) return;
+  if (st.idx >= st.questions.length) { finishQuiz(); return; }
+  const q = st.questions[st.idx];
+  const opts = q.options || [];
+  st.userAnswers = st.userAnswers || {};
+  const hasAnswered = st.userAnswers[st.idx] !== undefined;
+  st.answered = hasAnswered;
+  const chosenIdx = hasAnswered ? st.userAnswers[st.idx] : -1;
+  const ansIdx = typeof q.answer === "number" ? q.answer : 0;
+  const isRight = chosenIdx === ansIdx;
+
+  $("board").innerHTML = "";
+  const card = document.createElement("section");
+  card.className = "card";
+  let html = `<h2>QUESTION ${st.idx + 1} OF ${st.questions.length}</h2>`;
+  html += `<div style="font-size:18px; margin-bottom:14px;">${inline(q.question || q.q || "")}</div>`;
+  html += `<div id="quiz-opts">`;
+  opts.forEach((opt, idx) => {
+    let optClass = "quiz-opt";
+    if (hasAnswered) {
+      optClass += " locked";
+      if (idx === ansIdx) optClass += " correct";
+      else if (idx === chosenIdx && !isRight) optClass += " wrong";
+    }
+    html += `<button class="${optClass}" data-idx="${idx}">
+      <span class="quiz-key">${idx + 1}</span>
+      <span>${inline(String(opt))}</span>
+    </button>`;
+  });
+  html += `</div><div id="quiz-exp" class="quiz-explain" style="${hasAnswered ? "display:block" : "display:none"}">`;
+  if (hasAnswered) {
+    html += quizExplainHTML(isRight, ansIdx, opts, q.explain || q.explanation || q.note || "");
+  }
+  html += `</div>`;
+  card.innerHTML = html;
+  $("board").appendChild(card);
+  typeset(card);
+  if (!hasAnswered) {
+    card.querySelectorAll(".quiz-opt").forEach((btn) => { btn.onclick = () => selectQuizOption(+btn.dataset.idx); });
+  }
+  $("prog").textContent = `প্রশ্ন ${st.idx + 1} / ${st.questions.length}  ·  [1-4 / A-D] উত্তর  ·  [◂ / ArrowLeft] পূর্বের প্রশ্ন  ·  [Enter] পরের প্রশ্ন`;
+  $("btn-prev").style.display = "";
+  $("btn-prev").disabled = (st.idx <= 0);
+  $("btn-explain").style.display = "none";
+  $("btn-next").textContent = st.idx + 1 === st.questions.length ? "কুইজ সমাপ্ত ▸" : "পরবর্তী প্রশ্ন ▸";
+  $("btn-next").disabled = !st.answered;
+}
+
+function selectQuizOption(choiceIdx) {
+  const st = quizState;
+  if (!st || st.answered) return;
+  const q = st.questions[st.idx];
+  const opts = q.options || [];
+  if (choiceIdx < 0 || choiceIdx >= opts.length) return;
+  st.userAnswers = st.userAnswers || {};
+  st.userAnswers[st.idx] = choiceIdx;
+  st.answered = true;
+  const ansIdx = typeof q.answer === "number" ? q.answer : 0;
+  const isRight = choiceIdx === ansIdx;
+  if (isRight) st.score++;
+  else st.mistakes.push({
+    question: q.question || q.q || "", options: opts,
+    given: opts[choiceIdx], answer: opts[ansIdx], answer_idx: ansIdx,
+    explain: q.explain || q.explanation || q.note || ""
+  });
+  const btns = document.querySelectorAll(".quiz-opt");
+  btns.forEach((b, i) => {
+    b.classList.add("locked");
+    if (i === ansIdx) b.classList.add("correct");
+    else if (i === choiceIdx && !isRight) b.classList.add("wrong");
+  });
+  const exp = $("quiz-exp");
+  exp.innerHTML = quizExplainHTML(isRight, ansIdx, opts, q.explain || q.explanation || q.note || "");
+  exp.style.display = "block";
+  typeset(exp);
+  $("btn-next").disabled = false;
+}
+
+function retryCurrentQuiz() {
+  if (!quizState || !quizState.questions.length) return;
+  quizState.idx = 0;
+  quizState.score = 0;
+  quizState.answered = false;
+  quizState.userAnswers = {};
+  quizState.mistakes = [];
+  renderQuizQuestion();
+}
+
+function retryMistakesOnly() {
+  if (!quizState || !quizState.mistakes.length) return;
+  const mistakeQs = quizState.mistakes.map((m) => ({
+    question: m.question,
+    options: m.options,
+    answer: typeof m.answer_idx === "number" ? m.answer_idx : 0,
+    explain: m.explain || ""
+  }));
+  quizState = {
+    title: quizState.title + " (Mistake Review)",
+    questions: mistakeQs,
+    idx: 0,
+    score: 0,
+    answered: false,
+    userAnswers: {},
+    mistakes: []
+  };
+  renderQuizQuestion();
+}
+
+function finishQuiz() {
+  const st = quizState;
+  if (!st) return;
+  const pct = Math.round((st.score / Math.max(1, st.questions.length)) * 100);
+  const hasMistakes = st.mistakes.length > 0;
+  $("board").innerHTML = `<section class="card" style="text-align:center; padding:28px;">
+    <h2>QUIZ COMPLETE</h2>
+    <div style="font-size:32px; font-weight:700; color:#00ff88; margin:10px 0;">${st.score} / ${st.questions.length} (${pct}%)</div>
+    <p style="color:#9fc6e6; margin-bottom:20px;">${hasMistakes ? `${st.mistakes.length} question(s) saved to your Mistake Bank for revision.` : "Perfect score! Every answer was correct."}</p>
+    <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+      <button id="btn-quiz-retry" style="border-color:#00d4ff; color:#ffffff; padding:8px 18px;">↻ Retry Quiz [R]</button>
+      ${hasMistakes ? `<button id="btn-quiz-mistakes" style="border-color:#ffcc00; color:#ffcc00; padding:8px 18px;">⚠ Practice ${st.mistakes.length} Mistake(s) [M]</button>` : ""}
+      <button id="btn-quiz-clear" style="padding:8px 18px;">✓ Clear Board [Enter]</button>
+    </div>
+  </section>`;
+  $("btn-quiz-retry").onclick = retryCurrentQuiz;
+  if (hasMistakes && $("btn-quiz-mistakes")) {
+    $("btn-quiz-mistakes").onclick = retryMistakesOnly;
+  }
+  $("btn-quiz-clear").onclick = () => ops.clear();
+  $("prog").textContent = `Quiz completed: ${st.score}/${st.questions.length}  ·  [R] Retry  ·  ${hasMistakes ? "[M] Mistakes  ·  " : ""}[Enter / Ctrl+R] Clear Board`;
+  $("btn-next").disabled = true;
+  send("quiz_complete", { topic: st.title, score: st.score, total: st.questions.length, mistakes: st.mistakes });
+}
+
+function renderFlashcard() {
+  const st = flashState;
+  if (!st || !st.cards.length) return;
+  const c = st.cards[st.idx];
+  $("board").innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "flash-wrap card";
+  const rawContent = st.flipped ? c.back : c.front;
+  wrap.innerHTML = `<div class="flash-box${st.flipped ? " back" : ""}">
+    <div class="flash-tag">${st.flipped ? "ANSWER / FORMULA" : `CONCEPT CARD ${st.idx + 1} OF ${st.cards.length}`}</div>
+    <div class="flash-text">${inline(rawContent)}</div>
+    <div class="flash-hint">[Spacebar / Click] Flip Card  ·  [← / →] Previous / Next</div>
+  </div>`;
+  wrap.onclick = () => { st.flipped = !st.flipped; renderFlashcard(); };
+  $("board").appendChild(wrap);
+  typeset(wrap);
+  $("prog").textContent = `Flashcard ${st.idx + 1} / ${st.cards.length}  ·  [Space] Flip`;
+  $("btn-explain").style.display = "none";
+  $("btn-prev").style.display = "";
+  $("btn-prev").disabled = st.idx <= 0;
+  $("btn-next").textContent = "Next Card ▸";
+  $("btn-next").disabled = st.idx >= st.cards.length - 1;
+}
+
+function buildMindmapHTML(root) {
+  if (!root) return "";
+  const rootLabel = mindInline(root.label || root.title || root.name || "Main Topic");
+  const branches = Array.isArray(root.children) ? root.children : [];
+  let html = `<div class="mm-canvas"><div class="mm-root-box">${rootLabel}</div>`;
+  if (branches.length) {
+    html += `<div class="mm-trunk"></div><div class="mm-branches">`;
+    branches.forEach((branch, idx) => {
+      const bTitle = mindInline(branch.label || branch.title || branch.name || `Branch ${idx + 1}`);
+      const leaves = Array.isArray(branch.children) ? branch.children : [];
+      const bClass = `b${(idx % 5) + 1}`;
+      html += `<div class="mm-col ${bClass}"><div class="mm-branch-head ${bClass}"><span class="mm-branch-num">${idx + 1}</span>${bTitle}</div>`;
+      if (leaves.length) {
+        html += `<div class="mm-leaf-list">`;
+        leaves.forEach((leaf) => {
+          const lText = typeof leaf === "string" ? mindInline(leaf) : mindInline(leaf.label || leaf.title || leaf.name || "");
+          const subLeaves = (leaf && Array.isArray(leaf.children)) ? leaf.children : [];
+          html += `<div class="mm-leaf">${lText}`;
+          if (subLeaves.length) {
+            html += `<div class="mm-subleaf-list">`;
+            subLeaves.forEach((sub) => {
+              const sText = typeof sub === "string" ? mindInline(sub) : mindInline(sub.label || sub.title || "");
+              html += `<div class="mm-subleaf">${sText}</div>`;
+            });
+            html += `</div>`;
+          }
+          html += `</div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+const ops = {
+  render(p) {
+    activeMode = "board"; setModeBadge("SOLUTION");
+    lastSolution = p;
+    $("title").textContent = (p.title || "STUDY STATION").toUpperCase();
+    $("chip").textContent = p.subject || "";
+    $("chip").style.display = p.subject ? "" : "none";
+    sections = parse(p.markdown || "").map((s) => ({ title: s.title, ...blocks(s.body.join("\n")) }));
+    $("board").innerHTML = ""; shown = 0;
+    const first = p.reveal === "all" ? sections.length : Math.min(1, sections.length);
+    for (let i = 0; i < first; i++) add(i, p.reveal === "all");
+    if (p.reveal === "all") $("board").scrollTop = 0;   // show the heading, not the last card
+    bar();
+  },
+  next() {
+    if (activeMode === "quiz" && quizState) {
+      if (quizState.answered) { quizState.idx++; quizState.answered = false; renderQuizQuestion(); }
+      return;
+    }
+    if (activeMode === "flashcards" && flashState) {
+      if (flashState.idx < flashState.cards.length - 1) { flashState.idx++; flashState.flipped = false; renderFlashcard(); }
+      return;
+    }
+    if (shown < sections.length) add(shown);
+    bar();
+  },
+  prev() {
+    if (activeMode === "quiz" && quizState) {
+      if (quizState.idx > 0) {
+        quizState.idx--;
+        renderQuizQuestion();
+      }
+      return;
+    }
+    if (activeMode === "flashcards" && flashState) {
+      if (flashState.idx > 0) {
+        flashState.idx--;
+        flashState.flipped = false;
+        renderFlashcard();
+      }
+      return;
+    }
+    if (activeMode === "board" && shown > 1) {
+      shown--;
+      $("board").innerHTML = "";
+      const cur = shown;
+      for (let i = 0; i < cur; i++) add(i);
+      bar();
+      return;
+    }
+  },
+  restore(p) {
+    const target = (p && p.target) || activeMode;
+    if ((target === "quiz" || activeMode === "quiz") && quizState && quizState.questions && quizState.questions.length) {
+      activeMode = "quiz";
+      setModeBadge("QUIZ");
+      renderQuizQuestion();
+    } else if ((target === "solution" || target === "board" || activeMode === "board") && sections && sections.length) {
+      activeMode = "board";
+      setModeBadge("SOLUTION");
+      $("board").innerHTML = "";
+      const cur = shown;                       // add() rewrites `shown`; freeze the bound first
+      for (let i = 0; i < cur; i++) add(i);
+      bar();
+    } else if (lastQuiz && lastQuiz.questions && lastQuiz.questions.length) {
+      ops.quiz(lastQuiz);
+    } else if (lastSolution) {
+      ops.render(lastSolution);
+    } else if (activeMode === "flashcards" && flashState) {
+      renderFlashcard();
+    }
+  },
+  quiz(p) {
+    activeMode = "quiz"; setModeBadge("QUIZ");
+    lastQuiz = p;
+    $("title").textContent = (p.title || "PRACTICE QUIZ").toUpperCase();
+    $("chip").textContent = p.subject || "";
+    $("chip").style.display = p.subject ? "" : "none";
+    quizState = {
+      title: p.title || "Quiz",
+      questions: p.questions || [],
+      idx: 0,
+      score: 0,
+      answered: false,
+      userAnswers: {},
+      mistakes: []
+    };
+    renderQuizQuestion();
+  },
+  flashcards(p) {
+    activeMode = "flashcards"; setModeBadge("FLASHCARDS");
+    lastFlashcards = p;
+    $("title").textContent = (p.title || "FLASHCARDS").toUpperCase();
+    $("chip").textContent = p.subject || "";
+    $("chip").style.display = p.subject ? "" : "none";
+    flashState = { title: p.title || "Flashcards", cards: p.cards || [], idx: 0, flipped: false };
+    renderFlashcard();
+  },
+  mindmap(p) {
+    activeMode = "mindmap"; setModeBadge("MINDMAP");
+    $("title").textContent = (p.title || "CONCEPT MINDMAP").toUpperCase();
+    $("chip").textContent = p.subject || "";
+    $("chip").style.display = p.subject ? "" : "none";
+    $("board").innerHTML = `<section class="card" style="max-width:100%;">${buildMindmapHTML(p.tree || {})}</section>`;
+    typeset($("board"));
+    $("prog").textContent = "Visual Concept Tree";
+    $("btn-prev").style.display = "none";
+    $("btn-explain").style.display = "none";
+    $("btn-next").disabled = true;
+  },
+  status(p) {
+    $("board").innerHTML = "";
+    const d = document.createElement("div"); d.className = "status"; d.textContent = p.text || "";
+    $("board").appendChild(d); bar();
+  },
+  clear() {
+    activeMode = "board";
+    setModeBadge("BOARD");
+    sections = [];
+    shown = 0;
+    quizState = null;
+    flashState = null;
+    window._currentQuizActive = false;
+    $("board").innerHTML = '<div class="status">Ask a question to start.</div>';
+    $("title").textContent = "STUDY STATION";
+    $("chip").textContent = "";
+    $("chip").style.display = "none";
+    bar();
+    send("board_cleared", { clear: true });
+  },
+};
+
+const send = (type, data) => { if (bridge) bridge.userEvent(JSON.stringify({ type, ...(data || {}) })); };
+$("btn-next").onclick = () => ops.next();
+$("btn-prev").onclick = () => ops.prev();
+$("btn-explain").onclick = () => send("explain_step", { n: shown, title: (sections[shown - 1] || {}).title || "" });
+$("btn-reset").onclick = () => ops.clear();
+$("btn-exit").onclick = () => send("exit");
+
+window.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === "=" || e.key === "+") { e.preventDefault(); applyZoom(currentZoom + 10); return; }
+    if (e.key === "-" || e.key === "_") { e.preventDefault(); applyZoom(currentZoom - 10); return; }
+    if (e.key === "0") { e.preventDefault(); applyZoom(110); return; }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); ops.clear(); return; }
+  }
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+  if (activeMode === "quiz" && quizState) {
+    const isFinished = quizState.idx >= quizState.questions.length;
+    if (isFinished) {
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); retryCurrentQuiz(); }
+      else if ((e.key === "m" || e.key === "M") && quizState.mistakes.length) { e.preventDefault(); retryMistakesOnly(); }
+      else if (e.key === "Enter") { e.preventDefault(); ops.clear(); }
+      return;
+    }
+    const keyUp = e.key.toUpperCase();
+    const alphaMap = { "A": 0, "B": 1, "C": 2, "D": 3 };
+    if (keyUp in alphaMap) {
+      e.preventDefault();
+      selectQuizOption(alphaMap[keyUp]);
+    } else if (e.key >= "1" && e.key <= "9") {
+      e.preventDefault();
+      selectQuizOption(parseInt(e.key, 10) - 1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      ops.prev();
+    } else if ((e.key === "Enter" || e.key === " " || e.code === "Space") && quizState.answered) {
+      e.preventDefault();
+      ops.next();
+    }
+  } else if (activeMode === "flashcards" && flashState) {
+    if (e.key === " " || e.code === "Space") {
+      e.preventDefault();
+      flashState.flipped = !flashState.flipped; renderFlashcard();
+    } else if (e.key === "ArrowRight" || e.key === "Enter") {
+      e.preventDefault();
+      ops.next();
+    } else if (e.key === "ArrowLeft" && flashState.idx > 0) {
+      e.preventDefault();
+      ops.prev();
+    }
+  } else if (activeMode === "board") {
+    if (e.key === "ArrowLeft" && shown > 1) {
+      e.preventDefault();
+      ops.prev();
+    } else if ((e.key === "Enter" || e.code === "Space") && shown < sections.length) {
+      e.preventDefault();
+      ops.next();
+    }
+  }
+});
+
+if (typeof renderMathInElement === "undefined") {
+  ops.status({ text: "Board libraries missing.\nRun: python tools/fetch_study_vendor.py" });
+} else if (window.qt && typeof QWebChannel !== "undefined") {
+  new QWebChannel(qt.webChannelTransport, (ch) => {
+    bridge = ch.objects.bridge;
+    bridge.toBoard.connect((raw) => { try { const m = JSON.parse(raw); if (ops[m.op]) ops[m.op](m); } catch (e) { console.error(e); } });
+    bridge.boardReady();
+  });
+} else {
+  ops.status({ text: "Study board is waiting for JARVIS." });
+}
+
+</script>
+</body>
+</html>
